@@ -214,9 +214,8 @@ def register():
                 abort(500)
 
             logger.debug("using token %s" % form.token.data)
-            ips = ', '.join(request.headers.getlist('X-Forwarded-For') + [request.remote_addr]) \
-                if config.config.ip_logging else False
-            tokens.tokens.use(form.token.data, ips)
+            ip = request.remote_addr if config.config.ip_logging else False
+            tokens.tokens.use(form.token.data, ip)
 
             logger.debug("account creation succeded!")
             return jsonify(
