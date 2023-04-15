@@ -22,10 +22,14 @@ def find_version(*file_paths):
     raise RuntimeError("Unable to find version string.")
 
 
+def read_base_requires():
+    with open('requirements/base.pin') as f:
+        return re.findall(r"^[a-zA-Z0-9-_.[\],]+[<>=][^#\s]+", f.read(), flags=re.M)
+
+
 test_requirements = [
         "parameterized>=0.7.0"
 ]
-
 
 setuptools.setup(
     name='matrix-registration',
@@ -46,21 +50,7 @@ setuptools.setup(
                                           'static/images/*.png',
                                           'static/images/*.ico']},
     python_requires='~=3.7',
-    install_requires=[
-        "alembic>=1.8",
-        "appdirs>=1.4.4",
-        "Flask>=2.2",
-        "Flask-SQLAlchemy>=2.5.1",
-        "flask-cors>=3.0.10",
-        "flask-httpauth>=4.7.0",
-        "flask-limiter>=2.6",
-        "PyYAML>=6.0",
-        "jsonschema>=4.17",
-        "requests>=2.28",
-        "SQLAlchemy>=1.4",
-        "waitress>=2.1",
-        "WTForms>=3.0"
-    ],
+    install_requires=read_base_requires(),
     tests_require=test_requirements,
     extras_require={
         "postgres":  ["psycopg2-binary>=2.8.4"],
