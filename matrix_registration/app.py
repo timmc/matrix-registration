@@ -1,19 +1,18 @@
+import json
 import logging
 import logging.config
-import click
-import json
+import os
 
+import click
 from flask import Flask
 from flask.cli import FlaskGroup, pass_script_info
-from flask_limiter import Limiter
-from flask import request
 from flask_cors import CORS
 from waitress import serve
 
 from . import config
 from . import tokens
+from .limiter import limiter
 from .tokens import db
-import os
 
 
 def create_app(testing=False):
@@ -21,10 +20,12 @@ def create_app(testing=False):
     app.testing = testing
 
     with app.app_context():
-        from .api import api
+        from .api import api, healthcheck
 
         app.register_blueprint(api)
+        app.register_blueprint(healthcheck)
 
+    limiter.init_app(app)
     return app
 
 
@@ -34,33 +35,27 @@ def create_app(testing=False):
     create_app=create_app,
     context_settings=dict(help_option_names=["-h", "--help"]),
 )
-@click.option(
-    "--config-path", default="config.yaml", help="specifies the config file to be used"
-)
+@click.option("--config-path", help="specifies the config file to be used")
 @pass_script_info
 def cli(info, config_path):
     """a token based matrix registration app"""
-    config.config = config.Config(config_path)
+    config.config = config.Config(path=config_path)
     logging.config.dictConfig(config.config.logging)
     app = info.load_app()
     with app.app_context():
         app.config.from_mapping(
-            SQLALCHEMY_DATABASE_URI=config.config.db.format(cwd=f"{os.getcwd()}/"),
+            SQLALCHEMY_DATABASE_URI=config.config.db.format(cwd=f"{os.getcwd()}"),
             SQLALCHEMY_TRACK_MODIFICATIONS=False,
         )
         db.init_app(app)
         db.create_all()
         tokens.tokens = tokens.Tokens()
 
-def get_real_user_ip() -> str:
-    """ratelimit the users original ip instead of (optional) reverse proxy"""
-    return next(iter(request.headers.getlist('X-Forwarded-For')), request.remote_addr)
-        
+
 @cli.command("serve", help="start api server")
 @pass_script_info
 def run_server(info):
     app = info.load_app()
-    Limiter(app, key_func=get_real_user_ip, default_limits=config.config.rate_limit)
     if config.config.allow_cors:
         CORS(app)
     serve(

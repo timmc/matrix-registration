@@ -2,26 +2,22 @@
 # Standard library imports...
 import hashlib
 import hmac
-import logging
-import logging.config
 import json
+import logging.config
 import os
-import yaml
 import random
 import re
-import requests
-from requests import exceptions
 import string
 import sys
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 from urllib.parse import urlparse
 
 # Third-party imports...
+import yaml
 from parameterized import parameterized
-from datetime import datetime
-from click.testing import CliRunner
-from flask import Flask
+from requests import exceptions
 
 # Local imports...
 try:
@@ -29,7 +25,6 @@ try:
 except ModuleNotFoundError:
     from context import matrix_registration
 from matrix_registration.config import Config
-from matrix_registration.app import create_app
 from matrix_registration.tokens import db
 from matrix_registration.app import (
     create_app,
@@ -37,7 +32,6 @@ from matrix_registration.app import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 LOGGING = {
     "version": 1,
@@ -66,7 +60,7 @@ GOOD_CONFIG = {
     "db": "sqlite:///%s/tests/db.sqlite" % (os.getcwd(),),
     "host": "",
     "port": 5000,
-    "rate_limit": ["100 per day", "10 per minute"],
+    "rate_limit": ["1000 per day", "100 per minute"],
     "allow_cors": False,
     "password": {"min_length": 8},
     "username": {
@@ -187,7 +181,7 @@ def mocked_requests_post(*args, **kwargs):
 
 class TokensTest(unittest.TestCase):
     def setUp(self):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
         app = create_app(testing=True)
         with app.app_context():
             app.config.from_mapping(
@@ -390,11 +384,11 @@ class TokensTest(unittest.TestCase):
             test_token5 = test_tokens.new()
 
             expected_answer = (
-                "%s, " % test_token1.name
-                + "%s, " % test_token2.name
-                + "%s, " % test_token3.name
-                + "%s, " % test_token4.name
-                + "%s" % test_token5.name
+                    "%s, " % test_token1.name
+                    + "%s, " % test_token2.name
+                    + "%s, " % test_token3.name
+                    + "%s, " % test_token4.name
+                    + "%s" % test_token5.name
             )
 
             self.assertEqual(str(test_tokens), expected_answer)
@@ -402,7 +396,7 @@ class TokensTest(unittest.TestCase):
 
 class ApiTest(unittest.TestCase):
     def setUp(self):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
         app = create_app(testing=True)
         with app.app_context():
             app.config.from_mapping(
@@ -448,9 +442,9 @@ class ApiTest(unittest.TestCase):
         "matrix_registration.matrix_api.requests.post", side_effect=mocked_requests_post
     )
     def test_register(
-        self, username, password, confirm, token, status, mock_get, mock_nonce
+            self, username, password, confirm, token, status, mock_get, mock_nonce
     ):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
             test_token = matrix_registration.tokens.tokens.new(
@@ -484,7 +478,7 @@ class ApiTest(unittest.TestCase):
         "matrix_registration.matrix_api.requests.post", side_effect=mocked_requests_post
     )
     def test_register_wrong_hs(self, mock_get, mock_nonce):
-        matrix_registration.config.config = Config(BAD_CONFIG1)
+        matrix_registration.config.config = Config(data=BAD_CONFIG1)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -507,7 +501,7 @@ class ApiTest(unittest.TestCase):
         "matrix_registration.matrix_api.requests.post", side_effect=mocked_requests_post
     )
     def test_register_wrong_secret(self, mock_get, mock_nonce):
-        matrix_registration.config.config = Config(BAD_CONFIG3)
+        matrix_registration.config.config = Config(data=BAD_CONFIG3)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -526,7 +520,7 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(rv.status_code, 500)
 
     def test_get_tokens(self):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -545,7 +539,7 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data[0]["max_usage"], True)
 
     def test_error_get_tokens(self):
-        matrix_registration.config.config = Config(BAD_CONFIG2)
+        matrix_registration.config.config = Config(data=BAD_CONFIG2)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -554,7 +548,7 @@ class ApiTest(unittest.TestCase):
             )
 
             secret = matrix_registration.config.config.admin_api_shared_secret
-            matrix_registration.config.config = Config(GOOD_CONFIG)
+            matrix_registration.config.config = Config(data=GOOD_CONFIG)
             headers = {"Authorization": "SharedSecret %s" % secret}
             rv = self.client.get("/api/token", headers=headers)
 
@@ -572,7 +566,7 @@ class ApiTest(unittest.TestCase):
         ]
     )
     def test_post_token(self, expiration_date, max_usage, parsed_date):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -598,7 +592,7 @@ class ApiTest(unittest.TestCase):
             self.assertTrue(token_data["name"] is not None)
 
     def test_error_post_token(self):
-        matrix_registration.config.config = Config(BAD_CONFIG2)
+        matrix_registration.config.config = Config(data=BAD_CONFIG2)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -607,7 +601,7 @@ class ApiTest(unittest.TestCase):
             )
 
             secret = matrix_registration.config.config.admin_api_shared_secret
-            matrix_registration.config.config = Config(GOOD_CONFIG)
+            matrix_registration.config.config = Config(data=GOOD_CONFIG)
             headers = {"Authorization": "SharedSecret %s" % secret}
             rv = self.client.post(
                 "/api/token",
@@ -637,7 +631,7 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data["error"], "date wasn't in YYYY-MM-DD format")
 
     def test_patch_token(self):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -659,7 +653,7 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data["name"], test_token.name)
 
     def test_error_patch_token(self):
-        matrix_registration.config.config = Config(BAD_CONFIG2)
+        matrix_registration.config.config = Config(data=BAD_CONFIG2)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -667,7 +661,7 @@ class ApiTest(unittest.TestCase):
 
             secret = matrix_registration.config.config.admin_api_shared_secret
             headers = {"Authorization": "SharedSecret %s" % secret}
-            matrix_registration.config.config = Config(GOOD_CONFIG)
+            matrix_registration.config.config = Config(data=GOOD_CONFIG)
             rv = self.client.patch(
                 "/api/token/" + test_token.name,
                 data=json.dumps(dict(disabled=True)),
@@ -708,6 +702,70 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data["errcode"], "MR_TOKEN_NOT_FOUND")
             self.assertEqual(token_data["error"], "token does not exist")
 
+    def test_delete_token(self):
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
+
+        with self.app.app_context():
+            matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
+            test_token = matrix_registration.tokens.tokens.new(max_usage=True)
+
+            secret = matrix_registration.config.config.admin_api_shared_secret
+            headers = {"Authorization": "SharedSecret %s" % secret}
+            rv = self.client.get(
+                "/api/token/" + test_token.name,
+                content_type="application/json",
+                headers=headers,
+            )
+            self.assertEqual(rv.status_code, 200)
+
+            rv = self.client.delete(
+                "/api/token/" + test_token.name,
+                content_type="application/json",
+                headers=headers,
+            )
+            self.assertEqual(rv.status_code, 200)
+
+            rv = self.client.get(
+                "/api/token/" + test_token.name,
+                content_type="application/json",
+                headers=headers,
+            )
+            self.assertEqual(rv.status_code, 404)
+
+    def test_error_delete_token(self):
+        matrix_registration.config.config = Config(data=BAD_CONFIG2)
+
+        with self.app.app_context():
+            matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
+            test_token = matrix_registration.tokens.tokens.new(max_usage=True)
+
+            secret = matrix_registration.config.config.admin_api_shared_secret
+            headers = {"Authorization": "SharedSecret %s" % secret}
+            matrix_registration.config.config = Config(data=GOOD_CONFIG)
+            rv = self.client.delete(
+                "/api/token/" + test_token.name,
+                content_type="application/json",
+                headers=headers,
+            )
+
+            self.assertEqual(rv.status_code, 401)
+            token_data = json.loads(rv.data.decode("utf8").replace("'", '"'))
+            self.assertEqual(token_data["errcode"], "MR_BAD_SECRET")
+            self.assertEqual(token_data["error"], "wrong shared secret")
+
+            secret = matrix_registration.config.config.admin_api_shared_secret
+            headers = {"Authorization": "SharedSecret %s" % secret}
+            rv = self.client.delete(
+                "/api/token/" + "nicememe",
+                content_type="application/json",
+                headers=headers,
+            )
+
+            self.assertEqual(rv.status_code, 404)
+            token_data = json.loads(rv.data.decode("utf8"))
+            self.assertEqual(token_data["errcode"], "MR_TOKEN_NOT_FOUND")
+            self.assertEqual(token_data["error"], "token does not exist")
+
     @parameterized.expand(
         [
             [None, True, None],
@@ -716,7 +774,7 @@ class ApiTest(unittest.TestCase):
         ]
     )
     def test_get_token(self, expiration_date, max_usage, parsed_date):
-        matrix_registration.config.config = Config(BAD_CONFIG2)
+        matrix_registration.config.config = Config(data=BAD_CONFIG2)
 
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
@@ -738,7 +796,7 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data["max_usage"], max_usage)
 
     def test_error_get_token(self):
-        matrix_registration.config.config = Config(BAD_CONFIG2)
+        matrix_registration.config.config = Config(data=BAD_CONFIG2)
         with self.app.app_context():
             matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
             test_token = matrix_registration.tokens.tokens.new(max_usage=True)
@@ -756,11 +814,11 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data["errcode"], "MR_TOKEN_NOT_FOUND")
             self.assertEqual(token_data["error"], "token does not exist")
 
-            matrix_registration.config.config = Config(BAD_CONFIG2)
+            matrix_registration.config.config = Config(data=BAD_CONFIG2)
 
             secret = matrix_registration.config.config.admin_api_shared_secret
             headers = {"Authorization": "SharedSecret %s" % secret}
-            matrix_registration.config.config = Config(GOOD_CONFIG)
+            matrix_registration.config.config = Config(data=GOOD_CONFIG)
             rv = self.client.patch(
                 "/api/token/" + test_token.name,
                 data=json.dumps(dict(disabled=True)),
@@ -773,10 +831,30 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(token_data["errcode"], "MR_BAD_SECRET")
             self.assertEqual(token_data["error"], "wrong shared secret")
 
+    def test_rate_limit_exempt(self):
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
+
+        with self.app.app_context():
+            matrix_registration.tokens.tokens = matrix_registration.tokens.Tokens()
+            secret = matrix_registration.config.config.admin_api_shared_secret
+            headers = {"Authorization": "SharedSecret %s" % secret}
+
+            for i in range(110):
+                self.client.get("/api/token", headers=headers)
+
+            rv = self.client.get("/api/token", headers=headers)
+            self.assertEqual(rv.status_code, 429)
+
+            for i in range(110):
+                self.client.get("/health")
+
+            rv = self.client.get("/health")
+            self.assertEqual(rv.status_code, 200)
+
 
 class ConfigTest(unittest.TestCase):
     def test_config_update(self):
-        matrix_registration.config.config = Config(GOOD_CONFIG)
+        matrix_registration.config.config = Config(data=GOOD_CONFIG)
         self.assertEqual(matrix_registration.config.config.port, GOOD_CONFIG["port"])
         self.assertEqual(
             matrix_registration.config.config.server_location,
@@ -797,7 +875,7 @@ class ConfigTest(unittest.TestCase):
         with open(good_config_path, "w") as outfile:
             yaml.dump(GOOD_CONFIG, outfile, default_flow_style=False)
 
-        matrix_registration.config.config = Config(good_config_path)
+        matrix_registration.config.config = Config(path=good_config_path)
         self.assertIsNotNone(matrix_registration.config.config)
         os.remove(good_config_path)
 
