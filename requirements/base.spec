@@ -16,3 +16,6 @@ requests>=2.28
 SQLAlchemy>=1.4
 waitress>=2.1
 WTForms>=3.0
+
+# Just here as constraints -- not directly used.
+greenlet>=2.0.0a2  # 2.x needed for Python 3.11 compat
