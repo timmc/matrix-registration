@@ -18,4 +18,12 @@ waitress>=2.1
 WTForms>=3.0
 
 # Just here as constraints -- not directly used.
-greenlet>=2.0.0a2  # 2.x needed for Python 3.11 compat
+
+# greenlet 3.1.0+ needed for Python 3.13 compat
+greenlet>=3.1.0
+
+# pyyaml 6.0.0 has a bug that seems to show up for Python 3.13 but not 3.11.
+# Was getting "AttributeError: cython_sources" during install.
+#
+# See https://github.com/yaml/pyyaml/issues/724
+pyyaml>=6.0.1
